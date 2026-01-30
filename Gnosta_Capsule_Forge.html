@@ -24,12 +24,11 @@
     font-size:1em;
   }
   textarea{font-family:ui-monospace,Consolas,monospace;min-height:160px;resize:vertical}
-  #out{min-height:220px}
+  #out{min-height:240px}
   .row{display:flex;gap:10px;flex-wrap:wrap}
   .row button{flex:1 1 180px}
   button{background:#2563eb;border:none;font-weight:900;cursor:pointer}
   button.secondary{background:#334155;border:1px solid #475569}
-  button:active{transform:scale(0.99)}
   .hint{font-size:12px;color:#93c5fd;margin-top:6px;white-space:pre-wrap}
   .err{color:#fecaca}
 </style>
@@ -58,34 +57,35 @@
   <textarea id="msg" placeholder="Paste message here..."></textarea>
 
   <div class="row">
-    <button id="btnGen">Generate HTML</button>
-    <button class="secondary" id="btnSel">Select Output</button>
-    <button class="secondary" id="btnDl">Download Capsule HTML</button>
+    <button onclick="generate()">Generate HTML</button>
+    <button class="secondary" onclick="selectOutput()">Select Output</button>
+    <button class="secondary" onclick="downloadCapsule()">Download Capsule HTML</button>
   </div>
 
-  <div class="hint" id="status">Status: ready</div>
+  <div class="hint" id="status">Status: waiting for JS…</div>
   <div class="hint err" id="error"></div>
 
   <label>Generated capsule HTML:</label>
-  <textarea id="out" spellcheck="false" placeholder="(Output will appear here after you tap Generate HTML)"></textarea>
+  <textarea id="out" spellcheck="false" placeholder="Output will appear here after you tap Generate HTML"></textarea>
 </div>
 
 <script>
-(function(){
-  const $ = (id)=>document.getElementById(id);
+  // If you do NOT see "JS loaded ✅" after the page loads, the script is not running.
+  window.onload = function () {
+    setStatus("JS loaded ✅ (ready)");
+  };
+
+  function $(id){ return document.getElementById(id); }
 
   function setStatus(t){ $("status").textContent = "Status: " + t; }
   function setError(t){ $("error").textContent = t ? ("Error: " + t) : ""; }
 
   function esc(s){
-    return (s||"")
-      .replace(/&/g,"&amp;")
-      .replace(/</g,"&lt;")
-      .replace(/>/g,"&gt;");
+    return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
   function sanitizeFileName(name){
-    let s = (name || "").trim();
+    var s = (name || "").trim();
     if (!s) s = "Tap_SelectBrowser.html";
     s = s.replace(/[\\\/:\*\?"<>\|]/g, "_");
     s = s.replace(/[\. ]+$/g, "");
@@ -94,121 +94,113 @@
   }
 
   function buildCapsuleHtml(titleText, subtitleText, url, rawMessage, fileName){
-    const t = esc(titleText);
-    const sub = esc(subtitleText);
-    const link = esc(url);
-    const msg = esc(rawMessage);
-    const fn = esc(fileName);
+    var t = esc(titleText);
+    var sub = esc(subtitleText);
+    var link = esc(url);
+    var msg = esc(rawMessage);
+    var fn = esc(fileName);
 
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>${t}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="capsule-filename" content="${fn}">
-<style>
-  body{font-family:system-ui,Arial,sans-serif;background:#0f172a;color:#e5e7eb;padding:24px;}
-  .container{max-width:900px;margin:auto;}
-  h1{font-size:1.8em;margin:0 0 .2em 0;}
-  .brand{margin:0 0 1em 0;line-height:1.35;}
-  .brand .cm{color:#e5e7eb;font-weight:800;}
-  .brand .gn{color:#cbd5f5;font-weight:700;}
-  h2{font-size:1.2em;font-weight:normal;margin:0 0 1em 0;color:#cbd5f5;}
-  .btn{display:inline-block;margin-top:14px;margin-right:10px;padding:8px 14px;background:#334155;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.95em;font-weight:900;}
-  details{margin-top:12px;}
-  summary{cursor:pointer;font-weight:900;color:#cbd5f5;margin-bottom:10px;}
-  .content-box{background:#fff;color:#000;padding:16px;border-radius:10px;white-space:pre-wrap;font-family:Consolas,ui-monospace,monospace;font-size:.95em;max-height:60vh;overflow-y:auto;}
-  .download{display:inline-block;margin-top:24px;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:900;}
-</style>
-</head>
-<body>
-<div class="container">
-  <h1>${t}</h1>
-  <div class="brand">
-    <div class="cm">Carl Moore©</div>
-    <div class="gn">Gnosta™</div>
-  </div>
-  <h2>${sub}</h2>
-
-  <button class="btn" onclick="copyMessage()">Copy Message</button>
-
-  <details open>
-    <summary>Show / Hide Message</summary>
-    <pre id="messageBox" class="content-box">${msg}</pre>
-  </details>
-
-  <a class="download" href="${link}" target="_blank" rel="noopener">Download Files</a>
-</div>
-
-<script>
-  function copyMessage(){
-    const text = document.getElementById("messageBox").innerText;
-    if (navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text).then(()=>alert("Message copied."));
-    } else {
-      const range = document.createRange();
-      range.selectNodeContents(document.getElementById("messageBox"));
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      alert("Clipboard blocked here. Message selected so you can copy manually.");
-    }
-  }
-</script>
-</body>
-</html>`;
+    return '<!DOCTYPE html>\n'
+    + '<html lang="en">\n<head>\n<meta charset="UTF-8">\n'
+    + '<title>' + t + '</title>\n'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+    + '<meta name="capsule-filename" content="' + fn + '">\n'
+    + '<style>\n'
+    + 'body{font-family:system-ui,Arial,sans-serif;background:#0f172a;color:#e5e7eb;padding:24px;}\n'
+    + '.container{max-width:900px;margin:auto;}\n'
+    + 'h1{font-size:1.8em;margin:0 0 .2em 0;}\n'
+    + '.brand{margin:0 0 1em 0;line-height:1.35;}\n'
+    + '.brand .cm{color:#e5e7eb;font-weight:800;}\n'
+    + '.brand .gn{color:#cbd5f5;font-weight:700;}\n'
+    + 'h2{font-size:1.2em;font-weight:normal;margin:0 0 1em 0;color:#cbd5f5;}\n'
+    + '.btn{display:inline-block;margin-top:14px;margin-right:10px;padding:8px 14px;background:#334155;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.95em;font-weight:900;}\n'
+    + 'details{margin-top:12px;}\n'
+    + 'summary{cursor:pointer;font-weight:900;color:#cbd5f5;margin-bottom:10px;}\n'
+    + '.content-box{background:#fff;color:#000;padding:16px;border-radius:10px;white-space:pre-wrap;font-family:Consolas,ui-monospace,monospace;font-size:.95em;max-height:60vh;overflow-y:auto;}\n'
+    + '.download{display:inline-block;margin-top:24px;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:900;}\n'
+    + '</style>\n</head>\n<body>\n'
+    + '<div class="container">\n'
+    + '<h1>' + t + '</h1>\n'
+    + '<div class="brand"><div class="cm">Carl Moore©</div><div class="gn">Gnosta™</div></div>\n'
+    + '<h2>' + sub + '</h2>\n'
+    + '<button class="btn" onclick="copyMessage()">Copy Message</button>\n'
+    + '<details open><summary>Show / Hide Message</summary>\n'
+    + '<pre id="messageBox" class="content-box">' + msg + '</pre>\n'
+    + '</details>\n'
+    + '<a class="download" href="' + link + '" target="_blank" rel="noopener">Download Files</a>\n'
+    + '</div>\n'
+    + '<script>\n'
+    + 'function copyMessage(){\n'
+    + '  var el=document.getElementById("messageBox");\n'
+    + '  var text=el.innerText;\n'
+    + '  if(navigator.clipboard && navigator.clipboard.writeText){\n'
+    + '    navigator.clipboard.writeText(text).then(function(){alert("Message copied.");});\n'
+    + '  } else {\n'
+    + '    var r=document.createRange(); r.selectNodeContents(el);\n'
+    + '    var s=window.getSelection(); s.removeAllRanges(); s.addRange(r);\n'
+    + '    alert("Clipboard blocked here. Message selected so you can copy manually.");\n'
+    + '  }\n'
+    + '}\n'
+    + '<\/script>\n'
+    + '</body>\n</html>\n';
   }
 
   function generate(){
-    setError("");
-    const safeName = sanitizeFileName($("fname").value);
-    $("fname").value = safeName;
+    try{
+      setError("");
+      var safeName = sanitizeFileName($("fname").value);
+      $("fname").value = safeName;
 
-    const html = buildCapsuleHtml(
-      $("title").value,
-      $("subtitle").value,
-      $("link").value,
-      $("msg").value,
-      safeName
-    );
+      var html = buildCapsuleHtml(
+        $("title").value,
+        $("subtitle").value,
+        $("link").value,
+        $("msg").value,
+        safeName
+      );
 
-    $("out").value = html;
-    setStatus("generated (" + html.length + " chars)");
+      $("out").value = html;
+      setStatus("generated (" + html.length + " chars)");
+    } catch(e){
+      setError(e && e.message ? e.message : String(e));
+      setStatus("generate failed");
+    }
   }
 
   function selectOutput(){
-    const out = $("out");
-    out.focus();
-    out.select();
-    setStatus("selected output");
+    try{
+      setError("");
+      $("out").focus();
+      $("out").select();
+      setStatus("selected output");
+    } catch(e){
+      setError(e && e.message ? e.message : String(e));
+    }
   }
 
   function downloadCapsule(){
     try{
+      setError("");
       if (!$("out").value) generate();
-      const safeName = sanitizeFileName($("fname").value);
-      const blob = new Blob([$("out").value], {type:"text/html;charset=utf-8"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+
+      var safeName = sanitizeFileName($("fname").value);
+      var blob = new Blob([$("out").value], {type:"text/html;charset=utf-8"});
+      var url = URL.createObjectURL(blob);
+
+      var a = document.createElement("a");
       a.href = url;
       a.download = safeName;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url), 1500);
+
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
       setStatus("download attempted: " + safeName);
     } catch(e){
-      setError(String(e && e.message ? e.message : e));
+      setError(e && e.message ? e.message : String(e));
       setStatus("download failed");
     }
   }
-
-  $("btnGen").addEventListener("click", ()=>{ try{ generate(); } catch(e){ setError(String(e)); } });
-  $("btnSel").addEventListener("click", ()=>{ try{ selectOutput(); } catch(e){ setError(String(e)); } });
-  $("btnDl").addEventListener("click", ()=>{ try{ downloadCapsule(); } catch(e){ setError(String(e)); } });
-
-})();
 </script>
 </body>
 </html>
