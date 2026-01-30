@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gnosta Noema Forge</title>
+<style>
+  body{font-family:system-ui,Arial,sans-serif;background:#0f172a;color:#e5e7eb;padding:16px}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{margin:0 0 6px 0;font-size:2em}
+  .brand{margin:0 0 18px 0;line-height:1.25}
+  .brand .cm{font-weight:800}
+  .brand .gn{color:#cbd5f5;font-weight:700}
+  label{display:block;margin:10px 0 6px 0;color:#cbd5f5}
+  textarea,input,button{
+    width:100%;
+    margin:6px 0;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid #334155;
+    background:#0b1220;
+    color:#e5e7eb;
+    box-sizing:border-box;
+    font-size:1em;
+  }
+  textarea{font-family:ui-monospace,Consolas,monospace;min-height:160px;resize:vertical}
+  #out{min-height:260px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row button{flex:1 1 180px}
+  button{background:#2563eb;border:none;font-weight:900;cursor:pointer}
+  button.secondary{background:#334155;border:1px solid #475569}
+  button:active{transform:scale(0.99)}
+  .hint{font-size:12px;color:#93c5fd;margin-top:6px;white-space:pre-wrap}
+  .err{color:#fecaca}
+  .pillrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .pill{flex:1 1 240px;padding:10px 12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:#cbd5f5;font-size:12px}
+  code{background:#0b1220;border:1px solid #334155;border-radius:8px;padding:2px 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Gnosta Noema Forge</h1>
+  <div class="brand">
+    <div class="cm">Carl Moore©</div>
+    <div class="gn">Gnosta™</div>
+  </div>
+
+  <div class="pillrow">
+    <div class="pill">Local autosave: ON (this device only)</div>
+    <div class="pill">Mode: Human-first capsule (JSON placeholder ready)</div>
+  </div>
+
+  <label>Capsule title:</label>
+  <input id="title" value="Gnosta Noema Capsule">
+
+  <label>Subtitle line:</label>
+  <input id="subtitle" value="Message from Carl">
+
+  <label>Related link URL (optional):</label>
+  <input id="link" value="https://cwmoore-ai.github.io/">
+
+  <label>Related link label:</label>
+  <input id="linkLabel" value="Related Links">
+
+  <label>Capsule file name:</label>
+  <input id="fname" value="Noema_YYYY-MM-DD_HHMM.html">
+  <div class="hint">Tip: avoid characters like \ / : * ? " &lt; &gt; | (they will be replaced). If you leave the default, it will auto-stamp the current date/time.</div>
+
+  <label>Message content:</label>
+  <textarea id="msg" placeholder="Paste message here..."></textarea>
+
+  <div class="row">
+    <button onclick="generate()">Generate HTML</button>
+    <button class="secondary" onclick="selectOutput()">Select Output</button>
+    <button class="secondary" onclick="downloadCapsule()">Download Capsule HTML</button>
+  </div>
+
+  <div class="row">
+    <button class="secondary" onclick="clearMessageOnly()">Clear Message</button>
+    <button class="secondary" onclick="resetAllLocal()">Reset All (Local)</button>
+    <button class="secondary" onclick="loadoutQuickCapsule()">Loadout: Quick Capsule</button>
+  </div>
+
+  <div class="hint" id="status">Status: waiting for JS…</div>
+  <div class="hint err" id="error"></div>
+
+  <label>Generated capsule HTML:</label>
+  <textarea id="out" spellcheck="false" placeholder="Output will appear here after you tap Generate HTML"></textarea>
+
+  <div class="hint">
+    Notes:
+    1) If <code>Download Capsule HTML</code> is blocked in a weird browser context, use <code>Select Output</code> then paste into Markor and save as .html.
+    2) Local autosave stores drafts under keys like <code>noema_msg</code> and can be cleared with <code>Reset All (Local)</code>.
+  </div>
+</div>
+
+<script>
+window.onload = function () {
+  setStatus("JS loaded ✅ (ready)");
+  loadDraft();
+  enableAutosave();
+};
+
+// helpers
+function $(id){ return document.getElementById(id); }
+function setStatus(t){ $("status").textContent = "Status: " + t; }
+function setError(t){ $("error").textContent = t ? ("Error: " + t) : ""; }
+
+// HTML escaping for safe message embedding
+function esc(s){
+  return (s||"")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;");
+}
+
+// filename sanitizer: safe on Windows + generally safe elsewhere
+function sanitizeFileName(name){
+  var s = (name || "").trim();
+  if (!s) s = "Noema_Capsule.html";
+  s = s.replace(/[\\\/:\*\?"<>\|]/g, "_");
+  s = s.replace(/[\. ]+$/g, ""); // no trailing dots/spaces
+  if (!s.toLowerCase().endsWith(".html")) s += ".html";
+  return s;
+}
+
+// time helpers
+function pad2(n){ return (n<10 ? "0" : "") + n; }
+function localStamp(){
+  var d = new Date();
+  var yyyy = d.getFullYear();
+  var mm = pad2(d.getMonth()+1);
+  var dd = pad2(d.getDate());
+  var hh = pad2(d.getHours());
+  var mi = pad2(d.getMinutes());
+  return yyyy + "-" + mm + "-" + dd + "_" + hh + mi;
+}
+function isoNow(){
+  try { return new Date().toISOString(); } catch(e) { return ""; }
+}
+
+// if user left default template, auto-stamp it
+function resolveFileName(raw){
+  var v = (raw || "").trim();
+  var stamp = localStamp();
+  if (!v || v === "Noema_YYYY-MM-DD_HHMM.html") {
+    v = "Noema_" + stamp + ".html";
+  } else {
+    // allow user to use placeholders too
+    v = v.replace("YYYY-MM-DD_HHMM", stamp);
+  }
+  return sanitizeFileName(v);
+}
+
+// --- Noema Forge: local autosave (persistent workspace) ---
+function noemaKey(id){ return "noema_" + id; }
+
+function loadDraft(){
+  ["title","subtitle","link","linkLabel","fname","msg"].forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    var saved = localStorage.getItem(noemaKey(id));
+    if(saved !== null && saved !== undefined && saved !== ""){
+      el.value = saved;
+    }
+  });
+  setStatus("JS loaded ✅ (draft restored)");
+}
+
+function enableAutosave(){
+  ["title","subtitle","link","linkLabel","fname","msg"].forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener("input", function(){
+      localStorage.setItem(noemaKey(id), el.value);
+    });
+  });
+}
+
+function clearMessageOnly(){
+  var el = document.getElementById("msg");
+  if(el){
+    el.value = "";
+    localStorage.setItem(noemaKey("msg"), "");
+  }
+  setStatus("message cleared (saved)");
+}
+
+function resetAllLocal(){
+  ["title","subtitle","link","linkLabel","fname","msg"].forEach(function(id){
+    localStorage.removeItem(noemaKey(id));
+  });
+  setStatus("local draft reset (reload page)");
+}
+
+// quick defaults (missile loadout)
+function loadoutQuickCapsule(){
+  $("title").value = "Gnosta Noema Capsule";
+  $("subtitle").value = "Message from Carl";
+  $("link").value = "https://cwmoore-ai.github.io/";
+  $("linkLabel").value = "Related Links";
+  $("fname").value = "Noema_YYYY-MM-DD_HHMM.html";
+
+  // persist immediately
+  ["title","subtitle","link","linkLabel","fname"].forEach(function(id){
+    localStorage.setItem(noemaKey(id), $(id).value);
+  });
+
+  setStatus("loadout applied");
+}
+
+// capsule builder (human-first + JSON placeholder)
+function buildCapsuleHtml(titleText, subtitleText, url, urlLabel, rawMessage, fileName){
+  var t = esc(titleText);
+  var sub = esc(subtitleText);
+  var link = esc(url);
+  var linkLabel = esc(urlLabel);
+  var msg = esc(rawMessage);
+  var fn = esc(fileName);
+  var created = esc(isoNow());
+
+  var linkBlock = "";
+  if ((url||"").trim()){
+    linkBlock = '<a class="link" href="' + link + '" target="_blank" rel="noopener">' + linkLabel + '</a>';
+  }
+
+  // Placeholder for future JSON metadata (invisible to users, easy to edit later)
+  var jsonPlaceholder =
+'<!--\n'
++ 'GNOSTA_NOEMA_META_JSON\n'
++ '{\n'
++ '  "capsule_id": "",\n'
++ '  "created": "' + created + '",\n'
++ '  "title": "' + t.replace(/"/g,'\\"') + '",\n'
++ '  "author": "Carl Moore",\n'
++ '  "project": "Gnosta Noema",\n'
++ '  "tags": [],\n'
++ '  "source_url": "' + link.replace(/"/g,'\\"') + '"\n'
++ '}\n'
++ 'END_GNOSTA_NOEMA_META_JSON\n'
++ '-->';
+
+  return '<!DOCTYPE html>\n'
+  + '<html lang="en">\n<head>\n<meta charset="UTF-8">\n'
+  + '<title>' + t + '</title>\n'
+  + '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+  + '<meta name="capsule-filename" content="' + fn + '">\n'
+  + '<meta name="capsule-created" content="' + created + '">\n'
+  + '<style>\n'
+  + 'body{font-family:system-ui,Arial,sans-serif;background:#0f172a;color:#e5e7eb;padding:24px;}\n'
+  + '.container{max-width:900px;margin:auto;}\n'
+  + 'h1{font-size:1.8em;margin:0 0 .2em 0;}\n'
+  + '.brand{margin:0 0 10px 0;line-height:1.35;}\n'
+  + '.brand .cm{color:#e5e7eb;font-weight:800;}\n'
+  + '.brand .gn{color:#cbd5f5;font-weight:700;}\n'
+  + '.sub{font-size:1.1em;margin:0 0 10px 0;color:#cbd5f5;}\n'
+  + '.meta{font-size:12px;color:#94a3b8;margin:0 0 14px 0;}\n'
+  + '.btn{display:inline-block;margin-top:10px;margin-right:10px;padding:8px 14px;background:#334155;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.95em;font-weight:900;}\n'
+  + 'details{margin-top:12px;}\n'
+  + 'summary{cursor:pointer;font-weight:900;color:#cbd5f5;margin-bottom:10px;}\n'
+  + '.content{background:#fff;color:#000;padding:16px;border-radius:10px;white-space:pre-wrap;font-family:Consolas,ui-monospace,monospace;font-size:.95em;max-height:60vh;overflow-y:auto;}\n'
+  + '.link{display:inline-block;margin-top:18px;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:900;}\n'
+  + '</style>\n</head>\n<body>\n'
+  + '<div class="container">\n'
+  + '<h1>' + t + '</h1>\n'
+  + '<div class="brand"><div class="cm">Carl Moore©</div><div class="gn">Gnosta™</div></div>\n'
+  + '<div class="sub">' + sub + '</div>\n'
+  + '<div class="meta">Created: ' + created + ' • File: ' + fn + '</div>\n'
+  + '<button class="btn" onclick="copyMessage()">Copy Message</button>\n'
+  + '<details open><summary>Message</summary>\n'
+  + '<pre id="messageBox" class="content">' + msg + '</pre>\n'
+  + '</details>\n'
+  + linkBlock + '\n'
+  + '</div>\n'
+  + jsonPlaceholder + '\n'
+  + '<script>\n'
+  + 'function copyMessage(){\n'
+  + '  var el=document.getElementById("messageBox");\n'
+  + '  var text=el.innerText;\n'
+  + '  if(navigator.clipboard && navigator.clipboard.writeText){\n'
+  + '    navigator.clipboard.writeText(text).then(function(){alert("Message copied.");});\n'
+  + '  } else {\n'
+  + '    var r=document.createRange(); r.selectNodeContents(el);\n'
+  + '    var s=window.getSelection(); s.removeAllRanges(); s.addRange(r);\n'
+  + '    alert("Clipboard blocked here. Message selected so you can copy manually.");\n'
+  + '  }\n'
+  + '}\n'
+  + '<\\/script>\n'
+  + '</body>\n</html>\n';
+}
+
+// actions
+function generate(){
+  try{
+    setError("");
+
+    var safeName = resolveFileName($("fname").value);
+    $("fname").value = safeName;
+    localStorage.setItem(noemaKey("fname"), $("fname").value);
+
+    var html = buildCapsuleHtml(
+      $("title").value,
+      $("subtitle").value,
+      $("link").value,
+      $("linkLabel").value,
+      $("msg").value,
+      safeName
+    );
+
+    $("out").value = html;
+    setStatus("generated (" + html.length + " chars)");
+  } catch(e){
+    setError(e && e.message ? e.message : String(e));
+    setStatus("generate failed");
+  }
+}
+
+function selectOutput(){
+  try{
+    setError("");
+    $("out").focus();
+    $("out").select();
+    setStatus("selected output");
+  } catch(e){
+    setError(e && e.message ? e.message : String(e));
+  }
+}
+
+function downloadCapsule(){
+  try{
+    setError("");
+    if (!$("out").value) generate();
+
+    var safeName = resolveFileName($("fname").value);
+
+    var blob = new Blob([$("out").value], {type:"text/html;charset=utf-8"});
+    var url = URL.createObjectURL(blob);
+
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = safeName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+    setStatus("download attempted: " + safeName);
+  } catch(e){
+    setError(e && e.message ? e.message : String(e));
+    setStatus("download failed");
+  }
+}
+</script>
+</body>
+</html>
+```0
