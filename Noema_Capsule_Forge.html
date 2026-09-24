@@ -111,7 +111,9 @@ function esc(s){
   return (s||"")
     .replace(/&/g,"&amp;")
     .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;");
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
 }
 
 // filename sanitizer: safe on Windows + generally safe elsewhere
@@ -225,18 +227,22 @@ function buildCapsuleHtml(titleText, subtitleText, url, urlLabel, rawMessage, fi
   }
 
   // Placeholder for future JSON metadata (invisible to users, easy to edit later)
+  var meta = JSON.stringify({
+    capsule_id: "",
+    created: isoNow(),
+    title: titleText || "",
+    author: "Carl Moore",
+    project: "Gnosta Noema",
+    tags: [],
+    source_url: url || ""
+  }, null, 2)
+    .replace(/</g,"\\u003c")
+    .replace(/>/g,"\\u003e")
+    .replace(/--/g,"-\\u002d"); // keep the HTML comment from closing early
   var jsonPlaceholder =
 '<!--\n'
 + 'GNOSTA_NOEMA_META_JSON\n'
-+ '{\n'
-+ '  "capsule_id": "",\n'
-+ '  "created": "' + created + '",\n'
-+ '  "title": "' + t.replace(/"/g,'\\"') + '",\n'
-+ '  "author": "Carl Moore",\n'
-+ '  "project": "Gnosta Noema",\n'
-+ '  "tags": [],\n'
-+ '  "source_url": "' + link.replace(/"/g,'\\"') + '"\n'
-+ '}\n'
++ meta + '\n'
 + 'END_GNOSTA_NOEMA_META_JSON\n'
 + '-->';
 
@@ -285,7 +291,7 @@ function buildCapsuleHtml(titleText, subtitleText, url, urlLabel, rawMessage, fi
   + '    alert("Clipboard blocked here. Message selected so you can copy manually.");\n'
   + '  }\n'
   + '}\n'
-  + '<\\/script>\n'
+  + '<\/script>\n'
   + '</body>\n</html>\n';
 }
 
@@ -353,4 +359,3 @@ function downloadCapsule(){
 </script>
 </body>
 </html>
-```0
