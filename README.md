@@ -1,6 +1,6 @@
 # Gnosta Capsule Forge
 
-Simple browser tools for turning a message into a standalone HTML "capsule" page you can save, share, or open anywhere.
+Simple browser tools for sharing long messages: turn one into a standalone HTML "capsule" page, or split it into Discord-sized parts.
 
 Each tool is a single HTML file. Nothing to install and no build step. Just open the file in a browser (phone or PC).
 
@@ -20,7 +20,17 @@ The newer, full-featured forge.
 
 The original, simpler forge. Same basic idea, but no autosave. Its optional link shows as a "Download Files" button.
 
-## How to use
+### `Discord_Message_Splitter.html`
+
+Breaks a long message into parts that fit Discord's limit, each with its own **Copy** button.
+
+- **Limits:** 2,000 characters (free and Nitro Basic), 4,000 (Nitro), or a custom number.
+- **Smart splits:** cuts at paragraphs first, then lines, sentences, and words, so text stays readable.
+- **Options:** add "Part 1/3" labels, or wrap each part in a Discord code block (with an optional language for color).
+- **Copy Next Part:** a button at the bottom copies the parts in order and checks each one off.
+- Your text and settings are saved in this browser.
+
+## How to use the capsule forges
 
 1. Open the forge file in your browser.
 2. Fill in the title, subtitle, link, and file name.

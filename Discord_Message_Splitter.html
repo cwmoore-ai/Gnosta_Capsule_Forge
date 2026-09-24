@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discord Message Splitter</title>
+<style>
+  body{font-family:system-ui,Arial,sans-serif;background:#0f172a;color:#e5e7eb;padding:16px;margin:0}
+  .wrap{max-width:900px;margin:0 auto;padding-bottom:80px}
+  h1{margin:0 0 6px 0;font-size:2em}
+  .brand{margin:0 0 18px 0;line-height:1.25}
+  .brand .cm{font-weight:800}
+  .brand .gn{color:#cbd5f5;font-weight:700}
+  label{display:block;margin:10px 0 6px 0;color:#cbd5f5}
+  textarea,input,select,button{
+    width:100%;
+    margin:6px 0;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid #334155;
+    background:#0b1220;
+    color:#e5e7eb;
+    box-sizing:border-box;
+    font-size:1em;
+  }
+  textarea{font-family:ui-monospace,Consolas,monospace;min-height:200px;resize:vertical}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row > *{flex:1 1 180px}
+  button{background:#2563eb;border:none;font-weight:900;cursor:pointer;color:#fff}
+  button.secondary{background:#334155;border:1px solid #475569}
+  button:active{transform:scale(0.99)}
+  .check{display:flex;align-items:center;gap:10px;margin:10px 0;color:#e5e7eb}
+  .check input{width:auto;margin:0;transform:scale(1.3)}
+  .hint{font-size:12px;color:#93c5fd;margin-top:6px;white-space:pre-wrap}
+  .err{color:#fecaca}
+  .pillrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .pill{flex:1 1 240px;padding:10px 12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:#cbd5f5;font-size:12px}
+  .count{font-size:12px;color:#94a3b8;text-align:right}
+  .count.over{color:#fbbf24;font-weight:700}
+  #parts{margin-top:14px}
+  .part{border:1px solid #334155;border-radius:12px;background:#0b1220;margin:12px 0;overflow:hidden}
+  .part.copied{border-color:#22c55e}
+  .part-head{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#111a2e}
+  .part-head .name{flex:1;font-weight:800;color:#cbd5f5}
+  .part-head .len{font-size:12px;color:#94a3b8}
+  .part-head button{width:auto;margin:0;padding:8px 16px}
+  .part.copied .part-head button{background:#15803d}
+  .part pre{margin:0;padding:12px;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Consolas,monospace;font-size:.9em;max-height:40vh;overflow-y:auto;color:#e5e7eb}
+  .dock{position:fixed;left:0;right:0;bottom:0;padding:10px 16px;background:rgba(15,23,42,.95);border-top:1px solid #334155;display:none}
+  .dock.show{display:block}
+  .dock button{max-width:900px;display:block;margin:0 auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Discord Message Splitter</h1>
+  <div class="brand">
+    <div class="cm">Carl Moore©</div>
+    <div class="gn">Gnosta™</div>
+  </div>
+
+  <div class="pillrow">
+    <div class="pill">Free Discord: 2,000 characters per message. Nitro: 4,000.</div>
+    <div class="pill">Splits at paragraphs, then lines, then sentences, then words.</div>
+  </div>
+
+  <label>Message to split:</label>
+  <textarea id="msg" placeholder="Paste your long message here..."></textarea>
+  <div class="count" id="inCount">0 characters</div>
+
+  <div class="row">
+    <div>
+      <label>Message limit:</label>
+      <select id="limit">
+        <option value="2000">2,000 (Free / Nitro Basic)</option>
+        <option value="4000">4,000 (Nitro)</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div id="customWrap" style="display:none">
+      <label>Custom limit:</label>
+      <input id="customLimit" type="number" min="100" max="4000" value="1900">
+    </div>
+  </div>
+
+  <label class="check"><input type="checkbox" id="labels" checked> Add part labels, like <b>Part 1/3</b></label>
+  <label class="check"><input type="checkbox" id="fence"> Wrap each part in a Discord code block (```)</label>
+  <div id="langWrap" style="display:none">
+    <label>Code block language (optional, for color):</label>
+    <input id="lang" placeholder="e.g. js, python, txt">
+  </div>
+
+  <div class="row">
+    <button onclick="runSplit()">Split Message</button>
+    <button class="secondary" onclick="resetCopied()">Reset Copied Marks</button>
+    <button class="secondary" onclick="clearAll()">Clear</button>
+  </div>
+
+  <div class="hint" id="status">Status: waiting for JS…</div>
+  <div class="hint err" id="error"></div>
+
+  <div id="parts"></div>
+
+  <div class="hint">
+Notes:
+1) Each box shows exactly what to paste into Discord, labels and code block marks included.
+2) Tap Copy on each part, or use Copy Next Part at the bottom to go in order.
+3) Emoji and some symbols count as 2 characters here. That keeps you safely under the limit.
+4) In code block mode, any ``` inside your message gets a hidden space added so it can't close the block early.
+  </div>
+</div>
+
+<div class="dock" id="dock"><button id="nextBtn" onclick="copyNext()">Copy Next Part</button></div>
+
+<script>
+var parts = [];
+var copied = [];
+var timer = null;
+var FIELDS = ["msg","limit","customLimit","labels","fence","lang"];
+
+window.onload = function(){
+  loadDraft();
+  syncOptions();
+  FIELDS.forEach(function(id){
+    var el = $(id);
+    el.addEventListener("input", onChange);
+    el.addEventListener("change", onChange);
+  });
+  setStatus("JS loaded ✅ (ready)");
+  if ($("msg").value) runSplit();
+};
+
+function $(id){ return document.getElementById(id); }
+function setStatus(t){ $("status").textContent = "Status: " + t; }
+function setError(t){ $("error").textContent = t ? ("Error: " + t) : ""; }
+function fmt(n){ return n.toLocaleString(); }
+
+// --- local draft (this device only) ---
+function store(k, v){ try { localStorage.setItem("dms_" + k, v); } catch(e) {} }
+function recall(k){ try { return localStorage.getItem("dms_" + k); } catch(e) { return null; } }
+
+function saveDraft(){
+  FIELDS.forEach(function(id){
+    var el = $(id);
+    store(id, el.type === "checkbox" ? (el.checked ? "1" : "0") : el.value);
+  });
+}
+
+function loadDraft(){
+  FIELDS.forEach(function(id){
+    var v = recall(id), el = $(id);
+    if (v === null) return;
+    if (el.type === "checkbox") el.checked = (v === "1"); else el.value = v;
+  });
+}
+
+function onChange(){
+  syncOptions();
+  saveDraft();
+  clearTimeout(timer);
+  timer = setTimeout(runSplit, 300);
+}
+
+function syncOptions(){
+  $("customWrap").style.display = $("limit").value === "custom" ? "" : "none";
+  $("langWrap").style.display = $("fence").checked ? "" : "none";
+  var n = $("msg").value.length;
+  var c = $("inCount");
+  c.textContent = fmt(n) + " characters" + (n > getLimit() ? " (over the limit, will be split)" : "");
+  c.className = "count" + (n > getLimit() ? " over" : "");
+}
+
+function getLimit(){
+  if ($("limit").value !== "custom") return parseInt($("limit").value, 10);
+  var v = parseInt($("customLimit").value, 10);
+  if (!(v >= 100)) v = 100;
+  if (v > 4000) v = 4000;
+  return v;
+}
+
+// --- splitting ---
+function makeLabel(i, n){ return "**Part " + i + "/" + n + "**\n"; }
+
+function wrap(body, i, n, opts){
+  var out = body;
+  if (opts.fence) out = "```" + opts.lang + "\n" + body + "\n```";
+  if (opts.labels) out = makeLabel(i, n) + out;
+  return out;
+}
+
+// Find the best place to cut text so the first piece fits in max chars.
+function findCut(text, max){
+  var win = text.slice(0, max + 1);
+  var minGood = Math.floor(max * 0.3);
+  var i;
+
+  i = win.lastIndexOf("\n\n", max);
+  if (i >= minGood) return { cut: i, skip: 2 };
+
+  i = win.lastIndexOf("\n", max);
+  if (i >= minGood) return { cut: i, skip: 1 };
+
+  var best = -1, re = /[.!?]["')\]]*\s/g, m;
+  while ((m = re.exec(win)) !== null){
+    var end = m.index + m[0].length - 1; // position of the whitespace
+    if (end <= max) best = end;
+  }
+  if (best >= minGood) return { cut: best, skip: 1 };
+
+  i = win.lastIndexOf(" ", max);
+  if (i >= minGood) return { cut: i, skip: 1 };
+
+  // hard cut; don't split an emoji (surrogate pair) in half
+  var c = max;
+  var code = text.charCodeAt(c - 1);
+  if (code >= 0xD800 && code <= 0xDBFF) c--;
+  return { cut: c, skip: 0 };
+}
+
+function splitText(text, budget){
+  var out = [];
+  var rest = text;
+  while (rest.length > budget){
+    var r = findCut(rest, budget);
+    var piece = rest.slice(0, r.cut).replace(/\s+$/, "");
+    if (piece) out.push(piece);
+    rest = rest.slice(r.cut + r.skip).replace(/^\n+/, "");
+  }
+  if (rest.replace(/\s/g, "")) out.push(rest.replace(/\s+$/, ""));
+  return out;
+}
+
+function buildParts(text, limit, opts){
+  if (opts.fence) text = text.replace(/```/g, "`​`​`");
+  var fenceCost = opts.fence ? ("```" + opts.lang + "\n").length + "\n```".length : 0;
+
+  // The label length depends on the total part count, so settle it in a loop.
+  var n = 1, pieces = [];
+  for (var tries = 0; tries < 5; tries++){
+    var labelCost = opts.labels ? makeLabel(n, n).length : 0;
+    var budget = limit - fenceCost - labelCost;
+    if (budget < 50) throw new Error("limit is too small for these options");
+    pieces = splitText(text, budget);
+    if (String(pieces.length).length <= String(n).length) break;
+    n = pieces.length;
+  }
+
+  var total = pieces.length;
+  var useLabels = opts.labels && total > 1;
+  return pieces.map(function(p, idx){
+    return wrap(p, idx + 1, total, { fence: opts.fence, lang: opts.lang, labels: useLabels });
+  });
+}
+
+function runSplit(){
+  try{
+    setError("");
+    var text = $("msg").value;
+    var limit = getLimit();
+    var opts = {
+      labels: $("labels").checked,
+      fence: $("fence").checked,
+      lang: ($("lang").value || "").replace(/[^A-Za-z0-9_+#.-]/g, "")
+    };
+    if (!text.replace(/\s/g, "")){
+      parts = []; copied = []; render();
+      setStatus("paste a message to split");
+      return;
+    }
+    parts = buildParts(text, limit, opts);
+    copied = parts.map(function(){ return false; });
+    render();
+    setStatus("split into " + parts.length + " part" + (parts.length === 1 ? "" : "s") + " (limit " + fmt(limit) + ")");
+  } catch(e){
+    setError(e && e.message ? e.message : String(e));
+    setStatus("split failed");
+  }
+}
+
+// --- output ---
+function render(){
+  var box = $("parts");
+  box.innerHTML = "";
+  parts.forEach(function(p, i){
+    var card = document.createElement("div");
+    card.className = "part" + (copied[i] ? " copied" : "");
+    card.id = "part" + i;
+
+    var head = document.createElement("div");
+    head.className = "part-head";
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = "Part " + (i + 1) + " of " + parts.length;
+    var len = document.createElement("span");
+    len.className = "len";
+    len.textContent = fmt(p.length) + " chars";
+    var btn = document.createElement("button");
+    btn.textContent = copied[i] ? "Copied ✓" : "Copy";
+    btn.onclick = function(){ copyPart(i); };
+    head.appendChild(name); head.appendChild(len); head.appendChild(btn);
+
+    var pre = document.createElement("pre");
+    pre.textContent = p;
+
+    card.appendChild(head);
+    card.appendChild(pre);
+    box.appendChild(card);
+  });
+  updateDock();
+}
+
+function updateDock(){
+  var next = copied.indexOf(false);
+  var dock = $("dock");
+  if (parts.length < 2){ dock.className = "dock"; return; }
+  dock.className = "dock show";
+  $("nextBtn").textContent = next === -1
+    ? "All " + parts.length + " parts copied ✓"
+    : "Copy Next Part (" + (next + 1) + " of " + parts.length + ")";
+}
+
+function copyText(text, onDone){
+  function fallback(){
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed"; ta.style.top = "-1000px";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch(e) {}
+    ta.remove();
+    onDone(ok);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ onDone(true); }, fallback);
+  } else {
+    fallback();
+  }
+}
+
+function copyPart(i){
+  copyText(parts[i], function(ok){
+    if (ok){
+      copied[i] = true;
+      var card = $("part" + i);
+      card.className = "part copied";
+      card.querySelector("button").textContent = "Copied ✓";
+      updateDock();
+      setStatus("copied part " + (i + 1) + " of " + parts.length);
+    } else {
+      var r = document.createRange();
+      r.selectNodeContents($("part" + i).querySelector("pre"));
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      setStatus("clipboard blocked; part " + (i + 1) + " is selected so you can copy it by hand");
+    }
+  });
+}
+
+function copyNext(){
+  var next = copied.indexOf(false);
+  if (next === -1){ resetCopied(); return; }
+  copyPart(next);
+  var card = $("part" + next);
+  if (card && card.scrollIntoView) card.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+function resetCopied(){
+  copied = parts.map(function(){ return false; });
+  render();
+  setStatus("copied marks reset");
+}
+
+function clearAll(){
+  $("msg").value = "";
+  saveDraft();
+  syncOptions();
+  runSplit();
+}
+</script>
+</body>
+</html>
