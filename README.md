@@ -42,7 +42,7 @@ A capsule is a single dark-themed page with:
 ## Notes
 
 - Autosave uses browser `localStorage`. It stays on that device and browser only. Use **Reset All (Local)** to clear it.
-- Any text you enter is escaped, so symbols like `<`, `>`, and `"` show up as normal text and won't break the page.
+- In the Noema forge, any text you enter is escaped, so symbols like `<`, `>`, and `"` show up as normal text and won't break the page. The older Gnosta forge does not escape quote marks, so avoid `"` in its title and link fields.
 
 ---
 
