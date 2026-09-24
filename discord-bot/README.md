@@ -30,6 +30,12 @@ It splits at paragraphs first, then lines, sentences, and words, the same as `Di
 
 ## Part 2: Set it up on your VPS
 
+These steps are for the VPS at `45.77.121.164`, logged in as `carl`. Every command runs **on the VPS**.
+
+```bash
+ssh carl@45.77.121.164
+```
+
 You need **Node.js 20.12 or newer**. Check with `node -v`. If it's missing or old (Ubuntu/Debian):
 
 ```bash
@@ -40,12 +46,16 @@ sudo apt-get install -y nodejs
 Get the code and install:
 
 ```bash
-git clone https://github.com/cwmoore-ai/Gnosta_Capsule_Forge.git
-cd Gnosta_Capsule_Forge/discord-bot
-npm install
+cd ~
+git clone -b claude/vibrant-tesla-iije9w https://github.com/cwmoore-ai/Gnosta_Capsule_Forge.git
+cd ~/Gnosta_Capsule_Forge/discord-bot
+npm install --omit=dev
 cp .env.example .env
+chmod 600 .env   # only carl can read the token
 nano .env        # paste your token after DISCORD_TOKEN=
 ```
+
+(Once this branch is merged into `main`, you can leave off `-b claude/vibrant-tesla-iije9w`.)
 
 Try it:
 
@@ -55,25 +65,57 @@ npm start
 
 You should see `Logged in as Message Splitter#1234`. Paste a long message in Discord to test it, then press **Ctrl+C** to stop.
 
-## Part 3: Keep it running 24/7 with pm2
+## Part 3: Keep it running 24/7 with systemd
+
+This runs the bot the same way as the box's other services, so it starts after a reboot and restarts if it crashes.
+
+First check where Node is:
+
+```bash
+which node
+```
+
+If it prints anything other than `/usr/bin/node`, edit the `ExecStart=` line in `splitter-bot.service` to match. Then install the service:
+
+```bash
+sudo cp ~/Gnosta_Capsule_Forge/discord-bot/splitter-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now splitter-bot
+systemctl status splitter-bot
+```
+
+You should see **active (running)**.
+
+Handy commands:
+
+| Command | What it does |
+|---|---|
+| `journalctl -u splitter-bot -f` | Watch what the bot is doing (Ctrl+C to stop watching) |
+| `sudo systemctl restart splitter-bot` | Restart (do this after changing `.env`) |
+| `sudo systemctl stop splitter-bot` | Stop the bot |
+| `sudo systemctl disable --now splitter-bot` | Stop it and don't start on reboot |
+| `systemctl status splitter-bot` | See if it's running |
+
+**To update later:**
+
+```bash
+cd ~/Gnosta_Capsule_Forge && git pull
+cd discord-bot && npm install --omit=dev
+sudo systemctl restart splitter-bot
+```
+
+<details>
+<summary>Prefer pm2 instead of systemd?</summary>
 
 ```bash
 sudo npm install -g pm2
 pm2 start bot.js --name splitter
 pm2 save
-pm2 startup      # run the command it prints, so the bot starts after a reboot
+pm2 startup      # run the command it prints
 ```
 
-Handy pm2 commands:
-
-| Command | What it does |
-|---|---|
-| `pm2 logs splitter` | Watch what the bot is doing |
-| `pm2 restart splitter` | Restart (do this after changing `.env`) |
-| `pm2 stop splitter` | Stop the bot |
-| `pm2 status` | See if it's running |
-
-To update later: `git pull`, then `npm install`, then `pm2 restart splitter`.
+Use `pm2 logs splitter` to watch it and `pm2 restart splitter` after changes. Don't run both pm2 and systemd, or you'll get two bots posting everything twice.
+</details>
 
 ---
 
@@ -97,6 +139,7 @@ To update later: `git pull`, then `npm install`, then `pm2 restart splitter`.
 - The bot only reacts to files named exactly `message.txt`. Other files are left alone.
 - If two long messages come in at once in the same channel, the bot finishes one before starting the next, so the parts don't get mixed up.
 - **Never** put your `.env` file on GitHub. It's already in `.gitignore`.
+- Only run **one copy** of the bot per token. Two copies would post every split twice.
 
 ## Tests
 

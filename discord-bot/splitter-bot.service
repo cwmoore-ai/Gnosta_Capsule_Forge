@@ -1,0 +1,27 @@
+# systemd service for the Discord Message Splitter bot.
+# Install: sudo cp splitter-bot.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now splitter-bot
+# Paths assume the repo is cloned to /home/carl/Gnosta_Capsule_Forge and Node is at /usr/bin/node.
+# If `which node` prints something else, change ExecStart to match.
+
+[Unit]
+Description=Discord Message Splitter bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=carl
+WorkingDirectory=/home/carl/Gnosta_Capsule_Forge/discord-bot
+ExecStart=/usr/bin/node bot.js
+Restart=on-failure
+RestartSec=10
+
+# The bot only reads its own files and talks to Discord, so lock everything else down.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
