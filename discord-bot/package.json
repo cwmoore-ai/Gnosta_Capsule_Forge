@@ -1,0 +1,17 @@
+{
+  "name": "discord-message-splitter-bot",
+  "version": "1.0.0",
+  "description": "Splits long Discord messages (message.txt) into parts under the character limit.",
+  "main": "bot.js",
+  "private": true,
+  "scripts": {
+    "start": "node bot.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0"
+  }
+}

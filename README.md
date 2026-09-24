@@ -30,6 +30,10 @@ Breaks a long message into parts that fit Discord's limit, each with its own **C
 - **Copy Next Part:** a button at the bottom copies the parts in order and checks each one off.
 - Your text and settings are saved in this browser.
 
+### `discord-bot/`
+
+A Discord bot that does the splitting automatically. When a long paste turns into `message.txt`, the bot posts it back in parts, a few seconds apart. See [`discord-bot/README.md`](discord-bot/README.md) for setup.
+
 ## How to use the capsule forges
 
 1. Open the forge file in your browser.
