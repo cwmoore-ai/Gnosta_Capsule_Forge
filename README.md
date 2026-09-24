@@ -18,7 +18,7 @@ The newer, full-featured forge.
 
 ### `Gnosta_Capsule_Forge.html`
 
-The original, simpler forge. Same basic idea, but no autosave, and it always shows a "Download Files" link.
+The original, simpler forge. Same basic idea, but no autosave. Its optional link shows as a "Download Files" button.
 
 ## How to use
 
@@ -42,7 +42,7 @@ A capsule is a single dark-themed page with:
 ## Notes
 
 - Autosave uses browser `localStorage`. It stays on that device and browser only. Use **Reset All (Local)** to clear it.
-- In the Noema forge, any text you enter is escaped, so symbols like `<`, `>`, and `"` show up as normal text and won't break the page. The older Gnosta forge does not escape quote marks, so avoid `"` in its title and link fields.
+- Any text you enter is escaped, so symbols like `<`, `>`, and `"` show up as normal text and won't break the page.
 
 ---
 

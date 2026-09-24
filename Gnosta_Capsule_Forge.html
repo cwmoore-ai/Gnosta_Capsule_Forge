@@ -47,7 +47,7 @@
   <label>Subtitle line:</label>
   <input id="subtitle" value="Message from Carl:">
 
-  <label>Download Files link URL:</label>
+  <label>Download Files link URL (optional):</label>
   <input id="link" value="https://cwmoore-ai.github.io/">
 
   <label>Capsule file name (for Download button):</label>
@@ -81,7 +81,8 @@
   function setError(t){ $("error").textContent = t ? ("Error: " + t) : ""; }
 
   function esc(s){
-    return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   }
 
   function sanitizeFileName(name){
@@ -99,6 +100,11 @@
     var link = esc(url);
     var msg = esc(rawMessage);
     var fn = esc(fileName);
+
+    var linkBlock = "";
+    if ((url||"").trim()){
+      linkBlock = '<a class="download" href="' + link + '" target="_blank" rel="noopener">Download Files</a>\n';
+    }
 
     return '<!DOCTYPE html>\n'
     + '<html lang="en">\n<head>\n<meta charset="UTF-8">\n'
@@ -127,7 +133,7 @@
     + '<details open><summary>Show / Hide Message</summary>\n'
     + '<pre id="messageBox" class="content-box">' + msg + '</pre>\n'
     + '</details>\n'
-    + '<a class="download" href="' + link + '" target="_blank" rel="noopener">Download Files</a>\n'
+    + linkBlock
     + '</div>\n'
     + '<script>\n'
     + 'function copyMessage(){\n'
